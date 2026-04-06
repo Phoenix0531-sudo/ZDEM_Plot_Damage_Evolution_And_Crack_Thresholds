@@ -9,7 +9,10 @@ ZDEM 数据文件 I/O 模块
 功能：获取目标目录下指定文件结尾的列表，并转化为 Numpy 数组。
 """
 
-def get_file_list(DataDir, FileType):
+import typing
+import numpy.typing as npt
+
+def get_file_list(DataDir: str, FileType: str) -> list[str]:
     """
     输入参数：
     [1] DataDir  搜索目录
@@ -26,7 +29,7 @@ def get_file_list(DataDir, FileType):
                 ListFile.append(newDir)
     return ListFile
 
-def get_file_data(filename):
+def get_file_data(filename: str) -> npt.NDArray[np.float64]:
     """
     输入参数：
     [1] filename  文件名
@@ -59,3 +62,33 @@ def get_file_data(filename):
     array12 = np.array(array0)
     
     return array12
+
+def read_all_ids(DataDir: str, Thickness: float = 1.0, stress_factor: float = 1e6) -> dict[str, npt.NDArray[np.float64]]:
+    """
+    针对渐进破裂过程分析的综合数据读取器。
+    获取对应 _id_1 到 _id_4.dat 的数据并进行截断对齐与标准化缩放。
+    返回包含 s1, e1, e3, ek 字段的字典。
+    """
+    try:
+        file_id1 = get_file_list(DataDir, '_id_1.dat')[-1] # 轴压
+        file_id2 = get_file_list(DataDir, '_id_2.dat')[-1] # 轴变
+        file_id3 = get_file_list(DataDir, '_id_3.dat')[-1] # 横变
+        file_id4 = get_file_list(DataDir, '_id_4.dat')[-1] # 动能 (AE)
+    except IndexError:
+        raise FileNotFoundError(f"在目录 [{DataDir}] 未找到完整的 ID 1~4 数据文件，请检查！")
+    
+    # 提取数组，由于不同ZDEM压缩方向的正负有差异，强制取绝对值进行幅值统计
+    arr_s1 = np.abs(get_file_data(file_id1)[:, 1] / Thickness / stress_factor)
+    arr_e1 = np.abs(get_file_data(file_id2)[:, 1])
+    arr_e3 = np.abs(get_file_data(file_id3)[:, 1])
+    arr_ek = np.abs(get_file_data(file_id4)[:, 1])
+    
+    # 对齐截断数据（依靠最小行数同步数据阶段）
+    min_len = min(len(arr_s1), len(arr_e1), len(arr_e3), len(arr_ek))
+    
+    return {
+        's1': arr_s1[:min_len],
+        'e1': arr_e1[:min_len],
+        'e3': arr_e3[:min_len],
+        'ek': arr_ek[:min_len]
+    }
