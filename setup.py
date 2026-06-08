@@ -6,7 +6,7 @@ setup(
     description="ZDEM 岩石渐进破裂与损伤阈值分析系统 / Progressive Failure & Damage Threshold Analysis for ZDEM Rock Simulations",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
-    author="包羡钧 (Bao Xianjun)",
+    author="",
     license="MIT",
     packages=find_packages(),
     install_requires=[

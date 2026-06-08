@@ -9,5 +9,5 @@ macroscopic mechanical parameters and publication-grade visualization.
 """
 
 __version__ = "1.1.0"
-__author__ = "包羡钧 (Bao Xianjun)"
+__author__ = ""
 __license__ = "MIT"

@@ -5,7 +5,7 @@
 
 | | |
 |---|---|
-| Maintainer | Bao Xianjun (包羡钧) |
+| Maintainer | - |
 | License | [MIT](LICENSE) |
 | Python | >= 3.8 |
 | Dependencies | numpy, scipy, matplotlib |
@@ -265,4 +265,4 @@ ZDEM_Plot_Damage_Evolution_And_Crack_Thresholds/
 
 This project is distributed under the MIT License. See [LICENSE](LICENSE) for full text.
 
-Copyright (c) 2026 Bao Xianjun (包羡钧)
+Copyright (c) 2026
