@@ -1,64 +1,140 @@
 # ZDEM_Plot_Damage_Evolution_And_Crack_Thresholds
 
-- **维护人**：包羡钧
+**渐进破裂与损伤阈值分析系统 / Progressive Failure & Damage Threshold Analysis System**
 
-## 0. 数据准备 (ZDEM 脚本设置)
+> **维护人 / Maintainer**: 包羡钧 (Bao Xianjun)
 
-在运行本分析系统之前，您需要确保在 ZDEM 模拟脚本中包含以下监测指令，以导出必要的 `.dat` 文件：
+---
+
+## 项目简介 / Introduction
+
+这是一套面向 ZDEM（离散元法）岩石单轴压缩模拟数据的后处理分析系统。  
+This is a post-processing analysis system for ZDEM (Distinct Element Method) uniaxial compression simulation data.
+
+它能从微观监测数据中自动提取宏观力学参数与渐进破裂阈值，并生成顶刊级别的全演化破裂图表。  
+It automatically extracts macroscopic mechanical parameters and progressive failure thresholds from microscopic monitoring data, producing publication-ready evolution plots.
+
+**核心能力 / Core Capabilities**:
+
+- 批量读取 5 类 ZDEM 微观监测文件 (_id_1.dat ~ _id_5.dat) / Batch reading of 5 ZDEM monitoring files
+- 自动化合成体积应变 / Automatic volumetric strain synthesis
+- 提取弹性模量 E、泊松比 ν / Elastic modulus & Poisson's ratio extraction
+- 识别四大破裂阈值：CC、CI、CD、UCS / Identification of 4 failure thresholds: CC, CI, CD, UCS
+- 输出学术级全应变-能量演化折线图 / Academic-grade full strain-energy evolution plots
+
+---
+
+## 数据准备 / Data Preparation
+
+在运行本分析系统之前，需在 ZDEM 脚本中包含以下监测指令，以导出必要的 `.dat` 文件。  
+Before running this system, ensure your ZDEM simulation script includes the following monitoring commands to export the required `.dat` files.
 
 ```bash
-# 通过顶底部墙体移动距离，计算轴向应力，保存到 hist*_id_2.dat
+# 轴向应力监测（hist*_id_1.dat）/ axial stress
 HIST ID 1 INTERVAL 1 , gstress group top_wall
-HIST ID 2 INTERVAL 1 , gstrain group top_wall|bom_wall 
-# 框选试件最左侧边缘
+# 轴向应变监测（hist*_id_2.dat）/ axial strain
+HIST ID 2 INTERVAL 1 , gstrain group top_wall|bom_wall
+# 框选试件左侧边缘 / left edge group
 PROP group p_left range x 2000.0 2100.0 y 3000.0 11000.0
-# 框选试件最右侧边缘
+# 框选试件右侧边缘 / right edge group
 PROP group p_right range x 5900.0 6000.0 y 3000.0 11000.0
-# 监测左右颗粒组之间的相对距离变化 (横向应变)
+# 横向应变监测（hist*_id_3.dat）/ lateral strain
 HIST ID 3 INTERVAL 1 , gstrain group p_left|p_right
-# 记录颗粒体系动能
+# 体系动能监测（hist*_id_4.dat）/ kinetic energy (AE proxy)
 HIST ID 4 INTERVAL 10 , kinetic
+# 时序步数记录（hist*_id_5.dat）/ step counter
 HIST ID 5 INTERVAL 10 , step
 ```
 
-## 1. 物理监测要求 (数据输入端)
+---
 
-在运行本程序进行渐进破裂分析前，必须确保您的 ZDEM 脚本在加载或受压模拟段中，精确导出了以下 5 个特征数据文件，他们是提取各种阀值的基础：
+## 5 个必需数据文件 / 5 Required Data Files
 
-1. **ID 1**: 轴向载荷/应力 (`_id_1.dat`) —— 通常通过监测顶底墙的支座拉压（例如 `gstress` ）获得。
-2. **ID 2**: 轴向应变 (`_id_2.dat`) —— 基于顶底墙或特定上下特征颗粒的垂向位移差换算 (`gstrain`) 得到。
-3. **ID 3**: 横向应变 (`_id_3.dat`) —— 基于左右监控带或特征组颗粒的水平向外鼓胀位移差换算得到。
-4. **ID 4**: 动能体系总量 (`_id_4.dat`) —— 直接输出体系总体动能，可代理为岩石模拟中的宏观声发射（Acoustic Emission）信号。
-5. **ID 5**: 时序步数 (`_id_5.dat`) —— 输出计算累计步骤，用以同步所有序列。
+| 监测 ID / ID | 物理量 / Quantity | 文件后缀 / File Suffix | 说明 / Description |
+|:---:|:---|:---|:---|
+| 1 | 轴向应力 / Axial Stress | `_id_1.dat` | 顶底墙支座反力 / wall reaction force |
+| 2 | 轴向应变 / Axial Strain | `_id_2.dat` | 顶底墙垂向位移差 / vertical displacement |
+| 3 | 横向应变 / Lateral Strain | `_id_3.dat` | 左右监测带横向鼓胀 / lateral bulging |
+| 4 | 动能 / Kinetic Energy | `_id_4.dat` | 代理声发射信号 / AE proxy signal |
+| 5 | 计算步 / Time Step | `_id_5.dat` | 序列同步基准 / sequence synchronization |
 
-请注意：程序将按如上 `_id_X.dat` 的后缀智能匹配数据，并不挑剔前面的命名头长度。
+程序按 `_id_X.dat` 后缀智能匹配，不限制文件名前缀长度。  
+The program matches files by the `_id_X.dat` suffix regardless of the filename prefix.
 
-## 2. 工具算法与计算逻辑
+---
 
-核心子函数为 `plot2D.zdem_plot.plot_full_evolution_from_SubDir`，其在处理过程中已采取绝对值转换。
-具体物理过程算法如下：
+## 算法原理 / Algorithm
 
-- **体应变合成**：对于二维模型，由于压缩变形和膨胀变形符号转换成全正尺度处理，我们采取 $\epsilon_v = \epsilon_1 - \epsilon_3$ 去代理计算。
-- **弹性模量 (E, ν)**：以抗压峰值（UCS）的 30% ~ 50% 区段作为稳定的线弹性区段进行多项式一阶提取。
-- **扩容损伤点 (CD: Crack Damage)**：提取向压缩发展体应变之 **极大值（导数反向偏移点）**。
-- **微裂缝起裂点 (CI: Crack Initiation)**：从 50% UCS 后朝向主峰逼近，提取由微观滑移引起的测向应变 $\epsilon_3$ 异常，当它脱离“泊松比拟合线弹性基线”达到统计学阈值时，自动确认为起裂源头点。
-- **微裂缝闭合点 (CC: Crack Closure)**：同理，自 30% UCS 往前向非弹性前段索源定位 $\epsilon_1$ 的基准线大幅度背离点。
-- **衰减与跌落残余 (Residual)**：默认由失稳跌落后系统稳定最后期的均值作为该受加载样本的最终支撑抵抗带。
+- **体应变合成 / Volumetric Strain**: $\epsilon_v = \epsilon_1 - \epsilon_3$（基于二维全正标量假设 / based on 2D positive-scalar convention）
+- **弹性模量 / Elastic Moduli (E, ν)**: 取 UCS 的 30% ~ 50% 区段进行线性回归 / linear regression on the 30%–50% UCS segment
+- **扩容损伤点 / Crack Damage (CD)**: 体应变极大值（压缩→膨胀转折点）/ peak volumetric strain (compression-to-dilation turning point)
+- **微裂缝起裂点 / Crack Initiation (CI)**: 侧向应变偏离泊松比基线达 5σ 阈值 / lateral strain deviates from Poisson baseline by 5σ
+- **微裂缝闭合点 / Crack Closure (CC)**: 轴向应力反向偏离弹性基线达 5σ 阈值 / axial stress deviates backward from elastic baseline by 5σ
+- **残余强度 / Residual Strength**: 失稳后末段 10% 数据均值 / mean of the final 10% post-peak data
 
-## 3. 运行指南
+---
 
-您可以直接运行 `ZDEM_main_plot_damage_and_thresholds_from_dir.py` 进行单次结果的抽水：
+## 快速开始 / Quick Start
 
 ```python
 import os
-from plot2D import zdem_plot
+from plot2D import file_io, zdem_core, zdem_plot
 
-# 确定你的数据存放目标（里面涵盖上文强调的 _id_X.dat）
-# 注: 此处是模拟导出数据所在文件夹
-target_dir = r"X:\your\zdem\data_files\here"
+# 数据目录 / data directory (containing _id_X.dat files)
+target_dir = r"path\to\your\zdem\data"
+thickness = 1.0   # 2D 模型法向虚拟厚度 / virtual thickness (m)
+stress_factor = 1e6  # Pa → MPa
 
-# 调用主分析架构！一键到底
-result = zdem_plot.plot_full_evolution_from_SubDir(target_dir, Thickness=1.0)
+# 1. 读取数据 / read monitoring data
+raw_data = file_io.read_all_ids(target_dir, Thickness=thickness, stress_factor=stress_factor)
+
+# 2. 提取力学参数与阈值 / extract mechanical parameters & thresholds
+result = zdem_core.analyze_progressive_failure(raw_data)
+
+# 3. 渲染图表 / render publication-grade figure
+zdem_plot.plot_progressive_failure(raw_data, result, os.path.join(target_dir, "Progressive_Failure_Evolution.png"))
 ```
 
-执行完毕后，不仅控制台会高光打印四大阈值报告，还会在被查询目录内落地出一张极其清爽、全黑白线型无色的【顶刊专供・全演化破裂带折线图】。
+执行完毕后，控制台输出四阈值报告，同时生成高清全演化破裂折线图。  
+After execution, the console prints a 4-threshold report and a high-resolution evolution plot is saved.
+
+---
+
+## 安装依赖 / Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+**核心依赖 / Core**:
+| 包 / Package | 用途 / Purpose |
+|:---|:---|
+| `numpy` | 数值计算 / numerical computing |
+| `scipy` | 线性回归 / linear regression |
+| `matplotlib` | 数据可视化 / data visualization |
+
+---
+
+## 项目结构 / Project Structure
+
+```
+ZDEM_Plot_Damage_Evolution_And_Crack_Thresholds/
+├── ZDEM_main_plot_damage_and_thresholds_from_dir.py  # 主入口 / main entry
+├── plot2D/
+│   ├── __init__.py          # 包初始化 / package init
+│   ├── file_io.py           # 数据 I/O 模块 / data I/O
+│   ├── zdem_core.py         # 计算引擎 / computation engine
+│   └── zdem_plot.py         # 渲染引擎 / plotting engine
+├── requirements.txt         # 依赖清单 / dependencies
+├── LICENSE                  # MIT 许可证 / MIT license
+└── README.md                # 本文件 / this file
+```
+
+---
+
+## 开源许可 / License
+
+本项目基于 MIT 协议开源。  
+This project is open-sourced under the MIT License.
+
+Copyright (c) 2026 包羡钧 (Bao Xianjun)
