@@ -1,6 +1,6 @@
 <div align="center">
 
-# ZDEM_Plot_Damage_Evolution_And_Crack_Thresholds
+# ZDEM_Damage_Thresholds
 
 **ZDEM 岩石单轴压缩渐进破裂与损伤阈值分析系统**
 **Progressive Failure and Damage Threshold Analysis for ZDEM Uniaxial Compression Simulations**
@@ -241,7 +241,7 @@ pip install -r requirements.txt
 ## 项目结构 | Project Structure
 
 ```
-ZDEM_Plot_Damage_Evolution_And_Crack_Thresholds/
+ZDEM_Damage_Thresholds/
 |
 +-- ZDEM_main_plot_damage_and_thresholds_from_dir.py
 |       主入口脚本（可配置参数）
@@ -268,7 +268,7 @@ If you use this software in your research, please cite it as:
 @software{zdem_damage_evolution2026,
   title     = {{ZDEM} Progressive Failure and Damage Threshold Analysis System},
   year      = {2026},
-  url       = {https://github.com/Phoenix0531-sudo/ZDEM_Plot_Damage_Evolution_And_Crack_Thresholds},
+  url       = {https://github.com/Phoenix0531-sudo/ZDEM_Damage_Thresholds},
   license   = {MIT}
 }
 ```

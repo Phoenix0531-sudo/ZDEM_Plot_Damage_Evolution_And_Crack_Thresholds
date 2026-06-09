@@ -1,4 +1,4 @@
-# ZDEM Plot Damage Evolution
+# ZDEM Damage Thresholds
 
 Plot damage evolution and crack thresholds for ZDEM simulations.
 
